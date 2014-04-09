@@ -7,9 +7,11 @@
 // 1) Using int for both, "time" and "order_id"
 //    because the task says that time measures milliseconds
 //    since the beginning of the current trading day, therefore
-//    int should have enough capacity to hold milliseconds in one day
+//    int should have enough capacity to hold milliseconds in one day.
 //
-// 2) TODO: Will describe logic here...
+// 2) Utility classes implemented below: OrderBook and TWAP.
+//    Please see documentation for each class.
+//    Method main() is implemented last.
 //
 
 #include <map>
@@ -17,7 +19,29 @@
 #include <iostream>
 using namespace std;
 
-// Contains current orders and automatically calculates max price.
+// Contains current orders and automatically maintains max price.
+//
+// Order->price map contains prices arranged by order id, so that we
+// can find the price of an order when it needs to be erased by id.
+//
+// Price->count map contains the number of orders for each price point.
+// The map is sorted by price, so we can always obtain max price in O(1).
+// When there are no more orders for some price point, it is removed.
+//
+// Important: Using double as a key is generally not a good idea,
+// but it is justified in this case for price->count map because:
+//
+// 1) We are reading the prices from file and do *not* manipulate them
+//    before using as keys. Therefore, for example, if 10.3 price is read,
+//    it will be exactly == equal to another 10.3 read from another line.
+//
+// 2) We are managing an order book, and therefore in realistic conditions
+//    we actually expect to have many orders outstanding at the *same* price.
+//
+// 3) Market prices are not infinitely divisible, but instead change by
+//    ticks. Therefore, we can expect to have a *limited* number of price
+//    points around the current mid price. This counting algorithm
+//    will be very effective in such conditions.
 //
 class OrderBook {
 
