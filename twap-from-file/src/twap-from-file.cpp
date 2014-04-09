@@ -9,7 +9,7 @@
 //    since the beginning of the current trading day, therefore
 //    int should have enough capacity to hold milliseconds in one day
 //
-// 2) ...
+// 2) TODO: Will describe logic here...
 //
 
 #include <map>
