@@ -20,6 +20,9 @@
 #include <cmath>
 #include <limits>
 #include <iostream>
+#include <fstream>
+#include <sstream>
+#include <string>
 using namespace std;
 
 // Contains current orders and automatically maintains max price.
@@ -157,8 +160,11 @@ public:
 
 		if (!isnan(last_price_)) {
 
-			 // assuming the time is monotonically increasing
+			// assuming the time is monotonically increasing
 			const int add_time = time - last_time_;
+			if (add_time < 0)  {
+				return; // assumption was not valid
+			}
 
 			if (total_time_ > 0) {
 				const double new_total_time = total_time_ + add_time;
@@ -182,43 +188,71 @@ public:
 
 // Program entry point.
 //
-// Note: the program doesn't output the TWAP when the first price point is
-// processed because TWAP is still NAN at this time (no time has passed).
-// (Alternatively, it could output NAN when we process the first price.)
+// Note: the program doesn't output TWAP when the first order is processed
+//       because TWAP is still undefined at this time (no time has passed).
 //
 int main(int argc, char *argv[]) {
+
 	if (argc < 2) {
 		cerr << "ERROR: Please specify file name as argument.";
 		return 1;
 	}
-	string file_name = argv[1];
-	cout << "File name: " << file_name << endl;
+
+	const string file_name = argv[1];
+	ifstream input_stream(file_name);
+
+	if (!input_stream.good()) {
+		cerr << "ERROR: Can't access input file: " << file_name;
+		return 1;
+	}
 
 	OrderBook *order_book = new OrderBook();
 	TWAP *twap = new TWAP();
 
-	cout << order_book->max_price() << endl;
-	order_book->insert_order(100, 10.0);
-	twap->next_price(1000, order_book->max_price());
-	cout << 1000 << " | " << order_book->max_price() << " | " << twap->avg_price() << endl;
-	order_book->insert_order(101, 13.0);
-	twap->next_price(2000, order_book->max_price());
-	cout << 2000 << " | " << order_book->max_price() << " | " << twap->avg_price() << endl;
-	order_book->insert_order(102, 13.0);
-	twap->next_price(2200, order_book->max_price());
-	cout << 2200 << " | " << order_book->max_price() << " | " << twap->avg_price() << endl;
-	order_book->erase_order(101);
-	twap->next_price(2400, order_book->max_price());
-	cout << 2400 << " | " << order_book->max_price() << " | " << twap->avg_price() << endl;
-	order_book->erase_order(102);
-	twap->next_price(2500, order_book->max_price());
-	cout << 2500 << " | " << order_book->max_price() << " | " << twap->avg_price() << endl;
-	order_book->erase_order(100);
-	twap->next_price(4000, order_book->max_price());
-	cout << 4000 << " | " << order_book->max_price() << " | " << twap->avg_price() << endl;
+	for (string line; getline(input_stream, line); ) {
+
+		istringstream line_stream(line);
+
+		int time;
+		if (!(line_stream >> time)) {
+			continue; // no time in this line
+		}
+
+		string operation;
+		if (!(line_stream >> operation)) {
+			continue; // no operation in this line
+		}
+
+		int order_id;
+		if (!(line_stream >> order_id)) {
+			continue; // no order_id in this line
+		}
+
+		if (operation.compare("I") == 0) {
+
+			double price;
+			if (!(line_stream >> price)) {
+				continue; // no price in this line
+			}
+
+			order_book->insert_order(order_id, price);
+
+		} else if (operation.compare("E") == 0) {
+
+			order_book->erase_order(order_id);
+
+		} // else unknown operation, assuming this doesn't happen
+
+		twap->next_price(time, order_book->max_price());
+
+		const double twap_price = twap->avg_price();
+		if (!isnan(twap_price)) {
+			cout << twap_price << endl;
+		}
+	}
 
 	delete order_book;
+	delete twap;
 
-	cout << "DONE." << endl;
 	return 0;
 }
