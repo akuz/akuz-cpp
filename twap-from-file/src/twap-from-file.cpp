@@ -70,7 +70,6 @@ public:
 	}
 
 	~OrderBook() {
-
 		delete order_price_map_;
 		delete price_count_map_;
 	}
@@ -113,12 +112,11 @@ public:
 		}
 	}
 
-	double max_price() {
-		const map<double, int>::const_reverse_iterator it = price_count_map_->rbegin();
-		if (it == price_count_map_->rend()) {
+	double max_price() const {
+		if (price_count_map_->empty()) {
 			return numeric_limits<double>::quiet_NaN();
 		} else {
-			return it->first;
+			return price_count_map_->rbegin()->first;
 		}
 	}
 };
@@ -143,7 +141,7 @@ private:
 
 	double last_price_;
 	int last_time_;
-	double avg_price_;
+	double total_price_;
 	int total_time_;
 
 public:
@@ -151,7 +149,7 @@ public:
 	TWAP() {
 		last_price_ = numeric_limits<double>::quiet_NaN();
 		last_time_ = 0;
-		avg_price_ = numeric_limits<double>::quiet_NaN();
+		total_price_ = numeric_limits<double>::quiet_NaN();
 		total_time_ = 0;
 	}
 
@@ -163,21 +161,18 @@ public:
 
 		if (!isnan(last_price_)) {
 
-			// assuming the time is monotonically increasing
 			const int add_time = time - last_time_;
 			if (add_time < 0)  {
-				return; // assumption was not valid
+				return; // time is not increasing,
+						// but not generating error
+						// as per assumptions
 			}
-
 			if (total_time_ > 0) {
-				const double new_total_time = total_time_ + add_time;
-				avg_price_ = avg_price_  / new_total_time * total_time_
-						   + last_price_ / new_total_time * add_time;
-				total_time_ = new_total_time;
+				total_price_ += last_price_ * add_time;
 			} else {
-				avg_price_ = last_price_;
-				total_time_ = add_time;
+				total_price_ = last_price_ * add_time;
 			}
+			total_time_ += add_time;
 		}
 
 		last_price_ = price;
@@ -185,7 +180,7 @@ public:
 	}
 
 	double avg_price() {
-		return avg_price_;
+		return total_price_ / total_time_;
 	}
 };
 
@@ -209,8 +204,8 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	OrderBook *order_book = new OrderBook();
-	TWAP *twap = new TWAP();
+	unique_ptr<OrderBook> order_book(new OrderBook());
+	unique_ptr<TWAP> twap(new TWAP());
 
 	for (string line; getline(input_stream, line); ) {
 
@@ -253,9 +248,6 @@ int main(int argc, char *argv[]) {
 			cout << twap_price << endl;
 		}
 	}
-
-	delete order_book;
-	delete twap;
 
 	return 0;
 }
