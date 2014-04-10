@@ -4,15 +4,16 @@
 
 // IMPLEMENTATION NOTES:
 //
-// 1) Using int for both, "time" and "order_id"
-//    because the task says that time measures milliseconds
-//    since the beginning of the current trading day, therefore
-//    int should have enough capacity to hold milliseconds in one day.
+// 1) Using int type for both, "time" and "order_id" because the task states that time
+//    is measured in milliseconds since start of trading. I assume this code would be
+//    used to calculate TWAP within one trading day. Therefore, int type should have
+//    enough capacity to count all milliseconds in one trading day. Alternatively,
+//    the type of "time" can be changed to long for handling longer periods.
 //
 // 2) Using all names from std namespace directly without prefix, which
 //    might not always be the best idea, but it's ok for this test.
 //
-// 3) Utility classes implemented below: OrderBook and TWAP.
+// 3) Utility classes implemented below are OrderBook and TWAP.
 //    Please see documentation for each class.
 //    Method main() is implemented last.
 
@@ -39,15 +40,17 @@ using namespace std;
 //
 // 1) We are reading the prices from file and do *not* manipulate them
 //    before using as keys. Therefore, for example, if 10.3 price is read,
-//    it will be exactly == equal to another 10.3 read from another line.
+//    it will be exactly equal (==) to the double 10.3 read from another line.
 //
 // 2) We are managing an order book, and therefore in realistic conditions
-//    we actually expect to have many orders outstanding at the *same* price.
+//    we actually expect to have many orders outstanding at the *same* prices.
+//    Therefore, using order counting will greatly benefit the performance,
+//    as opposed to storing *all* orders in a map by price.
 //
 // 3) Market prices are not infinitely divisible, but instead change by
 //    ticks. Therefore, we can expect to have a *limited* number of price
 //    points around the current mid price. This counting algorithm
-//    will be very effective in such conditions.
+//    will, again, be very effective in such conditions.
 //
 class OrderBook {
 
