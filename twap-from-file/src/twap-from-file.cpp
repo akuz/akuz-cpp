@@ -9,10 +9,12 @@
 //    since the beginning of the current trading day, therefore
 //    int should have enough capacity to hold milliseconds in one day.
 //
-// 2) Utility classes implemented below: OrderBook and TWAP.
+// 2) Using all names from std namespace directly without prefix, which
+//    might not always be the best idea, but it's ok for this test.
+//
+// 3) Utility classes implemented below: OrderBook and TWAP.
 //    Please see documentation for each class.
 //    Method main() is implemented last.
-//
 
 #include <map>
 #include <cmath>
@@ -63,7 +65,6 @@ public:
 
 	~OrderBook() {
 
-		NAN;
 		delete order_price_map_;
 		delete price_count_map_;
 	}
@@ -119,7 +120,7 @@ public:
 // Calculates time-weighted average price (TWAP).
 //
 // Each time a new price is added, we can add the previous
-// price to the average since it now lasted for the time,
+// price to the average since it now lasted for the period
 // since the last price until the new price.
 //
 // The new price will only affect the time-weighted
@@ -179,10 +180,12 @@ public:
 	}
 };
 
-/**
- * Program entry point.
- *
- */
+// Program entry point.
+//
+// Note: the program doesn't output the TWAP when the first price point is
+// processed because TWAP is still NAN at this time (no time has passed).
+// (Alternatively, it could output NAN when we process the first price.)
+//
 int main(int argc, char *argv[]) {
 	if (argc < 2) {
 		cerr << "ERROR: Please specify file name as argument.";
