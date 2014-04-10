@@ -15,6 +15,7 @@
 //
 
 #include <map>
+#include <cmath>
 #include <limits>
 #include <iostream>
 using namespace std;
@@ -61,6 +62,8 @@ public:
 	}
 
 	~OrderBook() {
+
+		NAN;
 		delete order_price_map_;
 		delete price_count_map_;
 	}
@@ -103,7 +106,7 @@ public:
 		}
 	}
 
-	double curr_max_price() {
+	double max_price() {
 		const map<double, int>::const_reverse_iterator it = price_count_map_->rbegin();
 		if (it == price_count_map_->rend()) {
 			return numeric_limits<double>::quiet_NaN();
@@ -113,24 +116,36 @@ public:
 	}
 };
 
-// Calculates time-weighted average price.
+// Calculates time-weighted average price (TWAP).
+//
+// Each time a new price is added, we can add the previous
+// price to the average since it now lasted for the time,
+// since the last price until the new price.
+//
+// The new price will only affect the time-weighted
+// average after some time has passed, when the next
+// price point is added (valid price or NAN).
+//
+// If the new price is NAN, we just save it, and later it
+// won't be taken into account for average calculation,
+// because there was "no price" during this period.
 //
 class TWAP {
 
 private:
 
-	int total_time_;
-	int last_time_;
 	double last_price_;
-	double curr_twap_price_;
+	int last_time_;
+	double avg_price_;
+	int total_time_;
 
 public:
 
 	TWAP() {
-		total_time_ = 0;
-		last_time_ = numeric_limits<int>::quiet_NaN();
 		last_price_ = numeric_limits<double>::quiet_NaN();
-		curr_twap_price_ = numeric_limits<double>::quiet_NaN();
+		last_time_ = 0;
+		avg_price_ = numeric_limits<double>::quiet_NaN();
+		total_time_ = 0;
 	}
 
 	~TWAP() {
@@ -139,10 +154,28 @@ public:
 
 	void next_price(const int time, const double price) {
 
+		if (!isnan(last_price_)) {
+
+			 // assuming the time is monotonically increasing
+			const int add_time = time - last_time_;
+
+			if (total_time_ > 0) {
+				const double new_total_time = total_time_ + add_time;
+				avg_price_ = avg_price_  / new_total_time * total_time_
+						   + last_price_ / new_total_time * add_time;
+				total_time_ = new_total_time;
+			} else {
+				avg_price_ = last_price_;
+				total_time_ = add_time;
+			}
+		}
+
+		last_price_ = price;
+		last_time_ = time;
 	}
 
-	double curr_twap_price() {
-		return curr_twap_price_;
+	double avg_price() {
+		return avg_price_;
 	}
 };
 
@@ -158,23 +191,30 @@ int main(int argc, char *argv[]) {
 	string file_name = argv[1];
 	cout << "File name: " << file_name << endl;
 
-	OrderBook *orderBook = new OrderBook();
+	OrderBook *order_book = new OrderBook();
+	TWAP *twap = new TWAP();
 
-	cout << orderBook->curr_max_price() << endl;
-	orderBook->insert_order(100, 10.0);
-	cout << orderBook->curr_max_price() << endl;
-	orderBook->insert_order(101, 13.0);
-	cout << orderBook->curr_max_price() << endl;
-	orderBook->insert_order(102, 13.0);
-	cout << orderBook->curr_max_price() << endl;
-	orderBook->erase_order(100);
-	cout << orderBook->curr_max_price() << endl;
-	orderBook->erase_order(101);
-	cout << orderBook->curr_max_price() << endl;
-	orderBook->erase_order(102);
-	cout << orderBook->curr_max_price() << endl;
+	cout << order_book->max_price() << endl;
+	order_book->insert_order(100, 10.0);
+	twap->next_price(1000, order_book->max_price());
+	cout << 1000 << " | " << order_book->max_price() << " | " << twap->avg_price() << endl;
+	order_book->insert_order(101, 13.0);
+	twap->next_price(2000, order_book->max_price());
+	cout << 2000 << " | " << order_book->max_price() << " | " << twap->avg_price() << endl;
+	order_book->insert_order(102, 13.0);
+	twap->next_price(2200, order_book->max_price());
+	cout << 2200 << " | " << order_book->max_price() << " | " << twap->avg_price() << endl;
+	order_book->erase_order(101);
+	twap->next_price(2400, order_book->max_price());
+	cout << 2400 << " | " << order_book->max_price() << " | " << twap->avg_price() << endl;
+	order_book->erase_order(102);
+	twap->next_price(2500, order_book->max_price());
+	cout << 2500 << " | " << order_book->max_price() << " | " << twap->avg_price() << endl;
+	order_book->erase_order(100);
+	twap->next_price(4000, order_book->max_price());
+	cout << 4000 << " | " << order_book->max_price() << " | " << twap->avg_price() << endl;
 
-	delete orderBook;
+	delete order_book;
 
 	cout << "DONE." << endl;
 	return 0;
