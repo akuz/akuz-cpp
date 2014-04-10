@@ -113,11 +113,13 @@ public:
 	}
 
 	double max_price() const {
+		double result;
 		if (price_count_map_->empty()) {
-			return numeric_limits<double>::quiet_NaN();
+			result = numeric_limits<double>::quiet_NaN();
 		} else {
-			return price_count_map_->rbegin()->first;
+			result = price_count_map_->rbegin()->first;
 		}
+		return result;
 	}
 };
 
@@ -141,7 +143,7 @@ private:
 
 	double last_price_;
 	int last_time_;
-	double total_price_;
+	double avg_price_;
 	int total_time_;
 
 public:
@@ -149,12 +151,8 @@ public:
 	TWAP() {
 		last_price_ = numeric_limits<double>::quiet_NaN();
 		last_time_ = 0;
-		total_price_ = numeric_limits<double>::quiet_NaN();
+		avg_price_ = numeric_limits<double>::quiet_NaN();
 		total_time_ = 0;
-	}
-
-	~TWAP() {
-
 	}
 
 	void next_price(const int time, const double price) {
@@ -168,11 +166,18 @@ public:
 						// as per assumptions
 			}
 			if (total_time_ > 0) {
-				total_price_ += last_price_ * add_time;
+				// could have counted the total weighted price
+				// and then used total_weighted_price / total_time
+				// however, the task states the precision is not an issue
+				// so keeping like this for the sake of not overflowing
+				const double new_total_time = total_time_ + add_time;
+				avg_price_ = avg_price_  / new_total_time * total_time_
+						   + last_price_ / new_total_time * add_time;
+				total_time_ = new_total_time;
 			} else {
-				total_price_ = last_price_ * add_time;
+				avg_price_ = last_price_;
+				total_time_ = add_time;
 			}
-			total_time_ += add_time;
 		}
 
 		last_price_ = price;
@@ -180,7 +185,7 @@ public:
 	}
 
 	double avg_price() {
-		return total_price_ / total_time_;
+		return avg_price_;
 	}
 };
 
@@ -204,8 +209,8 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	unique_ptr<OrderBook> order_book(new OrderBook());
-	unique_ptr<TWAP> twap(new TWAP());
+	OrderBook order_book;
+	TWAP twap;
 
 	for (string line; getline(input_stream, line); ) {
 
@@ -233,17 +238,17 @@ int main(int argc, char *argv[]) {
 				continue; // no price in this line
 			}
 
-			order_book->insert_order(order_id, price);
+			order_book.insert_order(order_id, price);
 
 		} else if (operation.compare("E") == 0) {
 
-			order_book->erase_order(order_id);
+			order_book.erase_order(order_id);
 
 		} // else unknown operation, assuming this doesn't happen
 
-		twap->next_price(time, order_book->max_price());
+		twap.next_price(time, order_book.max_price());
 
-		const double twap_price = twap->avg_price();
+		const double twap_price = twap.avg_price();
 		if (!isnan(twap_price)) {
 			cout << twap_price << endl;
 		}
